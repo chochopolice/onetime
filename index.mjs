@@ -5,13 +5,13 @@ import { randomUUID } from 'crypto';
 const client = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 const TABLE = 'one-time-tokens';
 const TTL_SECONDS = 180;
-const REDIRECT_URL = 'https://chochopolice.github.io/stock/'; // リダイレクト先を固定
+const REDIRECT_URL = 'https://chochopolice.github.io/stock/';
 
 export const handler = async (event) => {
   const method = event.requestContext?.http?.method;
   const path = event.requestContext?.http?.path;
 
-  // POST /create : トークン発行（redirectUrl の指定不要）
+  // POST /create : トークン発行
   if (method === 'POST' && path === '/create') {
     const token = randomUUID();
     const ttl = Math.floor(Date.now() / 1000) + TTL_SECONDS;
@@ -28,7 +28,7 @@ export const handler = async (event) => {
     };
   }
 
-  // GET /r/:token : ワンタイムリダイレクト
+  // GET /r/:token : ワンタイム表示（URLを隠したままコンテンツを返す）
   const match = path?.match(/^\/r\/([^/]+)$/);
 
   if (method === 'GET' && match) {
@@ -46,15 +46,51 @@ export const handler = async (event) => {
         ReturnValues: 'ALL_NEW',
       }));
 
+      const targetUrl = result.Attributes.url;
+
+      // リダイレクトせずHTMLを返す（アドレスバーのURLは変わらない）
       return {
-        statusCode: 302,
-        headers: { Location: result.Attributes.url },
-        body: '',
+        statusCode: 200,
+        headers: { 'Content-Type': 'text/html; charset=utf-8' },
+        body: `<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>読み込み中...</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body, iframe { width: 100%; height: 100%; border: none; display: block; }
+  </style>
+</head>
+<body>
+  <iframe src="${targetUrl}" allowfullscreen></iframe>
+</body>
+</html>`,
       };
     } catch (e) {
       return {
         statusCode: 410,
-        body: 'このリンクは無効または使用済みです。',
+        headers: { 'Content-Type': 'text/html; charset=utf-8' },
+        body: `<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>無効なリンク</title>
+  <style>
+    body { font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; background: #f5f5f5; }
+    .box { text-align: center; padding: 40px; background: white; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.1); }
+    h1 { color: #e53e3e; margin-bottom: 12px; }
+    p { color: #666; }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h1>リンクが無効です</h1>
+    <p>このリンクはすでに使用済みか、有効期限が切れています。</p>
+  </div>
+</body>
+</html>`,
       };
     }
   }
