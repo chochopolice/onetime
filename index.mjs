@@ -5,23 +5,20 @@ import { randomUUID } from 'crypto';
 const client = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 const TABLE = 'one-time-tokens';
 const TTL_SECONDS = 180;
+const REDIRECT_URL = 'https://chochopolice.github.io/stock/'; // リダイレクト先を固定
 
 export const handler = async (event) => {
   const method = event.requestContext?.http?.method;
   const path = event.requestContext?.http?.path;
 
+  // POST /create : トークン発行（redirectUrl の指定不要）
   if (method === 'POST' && path === '/create') {
-    const body = JSON.parse(event.body || '{}');
-    if (!body.redirectUrl) {
-      return { statusCode: 400, body: JSON.stringify({ error: 'redirectUrl is required' }) };
-    }
-
     const token = randomUUID();
     const ttl = Math.floor(Date.now() / 1000) + TTL_SECONDS;
 
     await client.send(new PutCommand({
       TableName: TABLE,
-      Item: { token, url: body.redirectUrl, ttl, used: false },
+      Item: { token, url: REDIRECT_URL, ttl, used: false },
     }));
 
     const link = `https://${event.requestContext.domainName}/r/${token}`;
@@ -31,6 +28,7 @@ export const handler = async (event) => {
     };
   }
 
+  // GET /r/:token : ワンタイムリダイレクト
   const match = path?.match(/^\/r\/([^/]+)$/);
 
   if (method === 'GET' && match) {
