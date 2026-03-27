@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ワンタイムリンク 発行</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Noto+Sans+JP:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0e0f11;
+    --surface: #16181c;
+    --surface2: #1e2026;
+    --border: #2a2d35;
+    --accent: #4ade80;
+    --accent-dim: rgba(74, 222, 128, 0.12);
+    --accent-glow: rgba(74, 222, 128, 0.25);
+    --text: #e8eaf0;
+    --text-muted: #6b7280;
+    --text-dim: #9ca3af;
+    --danger: #f87171;
+    --danger-dim: rgba(248, 113, 113, 0.12);
+    --mono: 'DM Mono', monospace;
+    --sans: 'Noto Sans JP', sans-serif;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 60% 40% at 20% 10%, rgba(74,222,128,0.04) 0%, transparent 60%),
+      radial-gradient(ellipse 50% 30% at 80% 90%, rgba(74,222,128,0.03) 0%, transparent 60%);
+    pointer-events: none;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 3rem;
+    width: 100%;
+    max-width: 540px;
+    position: relative;
+  }
+
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 50%;
+    transform: translateX(-50%);
+    width: 60%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    opacity: 0.5;
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--accent-dim);
+    border: 1px solid rgba(74,222,128,0.2);
+    border-radius: 99px;
+    padding: 4px 12px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 0.08em;
+    margin-bottom: 1.5rem;
+  }
+
+  .badge::before {
+    content: '';
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.8); }
+  }
+
+  h1 {
+    font-size: 1.6rem;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    margin-bottom: 0.5rem;
+    line-height: 1.3;
+  }
+
+  .subtitle {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    font-weight: 300;
+    margin-bottom: 2.5rem;
+    line-height: 1.6;
+  }
+
+  .meta-row {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  .meta-item {
+    flex: 1;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.875rem 1rem;
+  }
+
+  .meta-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .meta-value {
+    font-family: var(--mono);
+    font-size: 0.875rem;
+    color: var(--accent);
+  }
+
+  .btn {
+    width: 100%;
+    padding: 1rem;
+    background: var(--accent);
+    color: #0a0a0a;
+    border: none;
+    border-radius: 10px;
+    font-family: var(--sans);
+    font-size: 0.9375rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    position: relative;
+    overflow: hidden;
+    letter-spacing: 0.01em;
+  }
+
+  .btn:hover:not(:disabled) {
+    background: #86efac;
+    transform: translateY(-1px);
+    box-shadow: 0 8px 24px var(--accent-glow);
+  }
+
+  .btn:active:not(:disabled) {
+    transform: translateY(0);
+  }
+
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .btn .spinner {
+    display: none;
+    width: 16px; height: 16px;
+    border: 2px solid rgba(0,0,0,0.2);
+    border-top-color: #0a0a0a;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    margin: 0 auto;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .btn.loading .btn-text { display: none; }
+  .btn.loading .spinner { display: block; }
+
+  .result {
+    margin-top: 1.5rem;
+    display: none;
+    animation: fadeIn 0.3s ease;
+  }
+
+  .result.show { display: block; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .result-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem 1.25rem;
+  }
+
+  .result-box.success { border-color: rgba(74,222,128,0.3); }
+  .result-box.error { border-color: rgba(248,113,113,0.3); background: var(--danger-dim); }
+
+  .result-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .result-box.success .result-label { color: var(--accent); }
+  .result-box.error .result-label { color: var(--danger); }
+
+  .result-url {
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    word-break: break-all;
+    line-height: 1.5;
+    margin-bottom: 0.875rem;
+  }
+
+  .result-actions {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .btn-copy, .btn-open {
+    flex: 1;
+    padding: 0.5rem 0.75rem;
+    border-radius: 7px;
+    font-family: var(--mono);
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+    border: 1px solid;
+    letter-spacing: 0.03em;
+  }
+
+  .btn-copy {
+    background: var(--accent-dim);
+    border-color: rgba(74,222,128,0.25);
+    color: var(--accent);
+  }
+
+  .btn-copy:hover { background: rgba(74,222,128,0.2); }
+  .btn-copy.copied { background: rgba(74,222,128,0.3); }
+
+  .btn-open {
+    background: transparent;
+    border-color: var(--border);
+    color: var(--text-dim);
+  }
+
+  .btn-open:hover { border-color: var(--text-muted); color: var(--text); }
+
+  .error-msg {
+    font-size: 0.875rem;
+    color: var(--danger);
+  }
+
+  .history {
+    margin-top: 2rem;
+    border-top: 1px solid var(--border);
+    padding-top: 1.5rem;
+  }
+
+  .history-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.875rem;
+  }
+
+  .history-title {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .btn-clear {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: color 0.15s;
+  }
+
+  .btn-clear:hover { color: var(--danger); }
+
+  .history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+
+  .history-list::-webkit-scrollbar { width: 4px; }
+  .history-list::-webkit-scrollbar-track { background: transparent; }
+  .history-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .history-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.625rem 0.875rem;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+
+  .history-item:hover { border-color: rgba(74,222,128,0.25); }
+
+  .history-time {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .history-url {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+  }
+
+  .history-copy {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-muted);
+    flex-shrink: 0;
+    transition: color 0.15s;
+  }
+
+  .history-item:hover .history-copy { color: var(--accent); }
+
+  .empty-history {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-muted);
+    text-align: center;
+    padding: 1rem;
+  }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="badge">ONE-TIME LINK GENERATOR</div>
+  <h1>ワンタイムリンク発行</h1>
+  <p class="subtitle">ボタンを押すと3分間有効な<br>使い切りURLを生成します</p>
+
+  <div class="meta-row">
+    <div class="meta-item">
+      <div class="meta-label">有効期限</div>
+      <div class="meta-value">180 sec</div>
+    </div>
+    <div class="meta-item">
+      <div class="meta-label">アクセス上限</div>
+      <div class="meta-value">1 回</div>
+    </div>
+    <div class="meta-item">
+      <div class="meta-label">リダイレクト先</div>
+      <div class="meta-value">stock /</div>
+    </div>
+  </div>
+
+  <button class="btn" id="generateBtn" onclick="generate()">
+    <span class="btn-text">URLを発行する</span>
+    <div class="spinner"></div>
+  </button>
+
+  <div class="result" id="result"></div>
+
+  <div class="history" id="historySection">
+    <div class="history-header">
+      <span class="history-title">発行履歴</span>
+      <button class="btn-clear" onclick="clearHistory()">クリア</button>
+    </div>
+    <div class="history-list" id="historyList">
+      <div class="empty-history">まだ発行履歴はありません</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const ENDPOINT = 'https://kzrlnjbcok7xrt2u4qkbbi4oym0xzalm.lambda-url.us-east-1.on.aws/create';
+let history = JSON.parse(localStorage.getItem('ott_history') || '[]');
+
+renderHistory();
+
+async function generate() {
+  const btn = document.getElementById('generateBtn');
+  const result = document.getElementById('result');
+
+  btn.disabled = true;
+  btn.classList.add('loading');
+  result.classList.remove('show');
+
+  try {
+    const res = await fetch(ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({})
+    });
+
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const link = data.link;
+
+    result.innerHTML = `
+      <div class="result-box success">
+        <div class="result-label">発行されたURL</div>
+        <div class="result-url" id="generatedUrl">${link}</div>
+        <div class="result-actions">
+          <button class="btn-copy" id="copyBtn" onclick="copyUrl('${link}')">コピー</button>
+          <button class="btn-open" onclick="window.open('${link}', '_blank')">ブラウザで開く</button>
+        </div>
+      </div>`;
+    result.classList.add('show');
+
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    history.unshift({ url: link, time: timeStr });
+    if (history.length > 10) history.pop();
+    localStorage.setItem('ott_history', JSON.stringify(history));
+    renderHistory();
+
+  } catch (e) {
+    result.innerHTML = `
+      <div class="result-box error">
+        <div class="result-label">エラー</div>
+        <div class="error-msg">URLの発行に失敗しました。<br>Lambdaエンドポイントに接続できません。</div>
+      </div>`;
+    result.classList.add('show');
+  } finally {
+    btn.disabled = false;
+    btn.classList.remove('loading');
+  }
+}
+
+async function copyUrl(url) {
+  await navigator.clipboard.writeText(url);
+  const btn = document.getElementById('copyBtn');
+  if (btn) {
+    btn.textContent = 'コピー完了！';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = 'コピー';
+      btn.classList.remove('copied');
+    }, 2000);
+  }
+}
+
+function renderHistory() {
+  const list = document.getElementById('historyList');
+  if (history.length === 0) {
+    list.innerHTML = '<div class="empty-history">まだ発行履歴はありません</div>';
+    return;
+  }
+  list.innerHTML = history.map(item => `
+    <div class="history-item" onclick="copyHistoryUrl('${item.url}', this)">
+      <span class="history-time">${item.time}</span>
+      <span class="history-url">${item.url}</span>
+      <span class="history-copy">コピー</span>
+    </div>
+  `).join('');
+}
+
+async function copyHistoryUrl(url, el) {
+  await navigator.clipboard.writeText(url);
+  const span = el.querySelector('.history-copy');
+  span.textContent = '完了！';
+  setTimeout(() => span.textContent = 'コピー', 1500);
+}
+
+function clearHistory() {
+  history = [];
+  localStorage.removeItem('ott_history');
+  renderHistory();
+}
+</script>
+</body>
+</html>
